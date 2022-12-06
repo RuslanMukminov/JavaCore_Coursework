@@ -11,12 +11,21 @@ import java.util.*;
 
 public class FinanceManager {
     private final String OTHER = "другое";
-    private final Map<String, List<String>> categories = new HashMap<>();
-    private final Map<String, Long> spendEntirePeriod = new HashMap<>();
+    private Map<String, List<String>> categories = new HashMap<>();
+    private Map<String, Long> spendEntirePeriod = new HashMap<>();
 
     public FinanceManager(File tsvFile) throws IOException {
         readTsv(tsvFile);
         initialSpendEntirePeriod();
+    }
+
+    public FinanceManager(Map<String, List<String>> categories) {
+        this.categories = categories;
+        initialSpendEntirePeriod();
+    }
+
+    public Map<String, Long> getSpendEntirePeriod() {
+        return spendEntirePeriod;
     }
 
     public void readTsv(File tsvFile) throws IOException {
