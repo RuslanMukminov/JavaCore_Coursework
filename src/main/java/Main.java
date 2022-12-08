@@ -3,14 +3,19 @@ import java.net.ServerSocket;
 import java.net.Socket;
 
 public class Main {
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, ClassNotFoundException {
         String tsvFileName = "categories.tsv";
+        String binFileName = "data.bin";
         File tsvFile = new File(tsvFileName);
+        File binFile = new File(binFileName);
 
-        String buy;
-        String maxCategory;
+        FinanceManager financeManager;
 
-        FinanceManager financeManager = new FinanceManager(tsvFile);
+        if (binFile.exists()) {
+            financeManager = FinanceManager.loadFromBin(binFile);
+        } else {
+            financeManager = new FinanceManager(tsvFile);
+        }
 
         try (ServerSocket serverSocket = new ServerSocket(8989);) { // стартуем сервер один(!) раз
             while (true) { // в цикле(!) принимаем подключения
@@ -19,10 +24,11 @@ public class Main {
                         BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                         PrintWriter out = new PrintWriter(socket.getOutputStream());
                 ) {
-                    buy = in.readLine();
+                    String buy = in.readLine();
                     financeManager.addBuy(buy);
-                    maxCategory = financeManager.maxCategory();
+                    String maxCategory = financeManager.maxCategory();
                     out.println(maxCategory);
+                    financeManager.saveBin(binFile);
                 }
             }
         } catch (IOException e) {
