@@ -3,13 +3,10 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 
-public class FinanceManager {
+public class FinanceManager implements Serializable {
     private final String OTHER = "другое";
     private Map<String, List<String>> categories = new HashMap<>();
     private Map<String, Long> spendEntirePeriod = new HashMap<>();
@@ -101,4 +98,15 @@ public class FinanceManager {
         return obj.toJSONString();
     }
 
+    public void saveBin(File file) throws IOException {
+        try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(file))) {
+            out.writeObject(this);
+        }
+    }
+
+    public static FinanceManager loadFromBin(File file) throws IOException, ClassNotFoundException {
+        try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(file))) {
+            return (FinanceManager) in.readObject();
+        }
+    }
 }

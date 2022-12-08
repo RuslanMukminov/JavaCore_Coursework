@@ -2,6 +2,7 @@
 *.iml
 *.idea
 Client.java
+data.bin
 
 # будут игнорироваться каталоги
 out/
