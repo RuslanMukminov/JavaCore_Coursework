@@ -1,112 +1,107 @@
-import org.json.simple.JSONArray;
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
-
 import java.io.*;
-import java.util.*;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.TreeSet;
 
 public class FinanceManager implements Serializable {
-    private final String OTHER = "другое";
-    private Map<String, List<String>> categories = new HashMap<>();
-    private Map<String, Long> spendEntirePeriod = new HashMap<>();
+    protected Map<String, Map<String, Long>> spendDayCategory = new HashMap<>();
+    protected Map<String, Map<String, Long>> spendMonthCategory = new HashMap<>();
+    protected Map<String, Map<String, Long>> spendYearCategory = new HashMap<>();
+    protected Map<String, Long> spendEntirePeriod = new HashMap<>();
+    protected String year;
+    protected String month;
+    protected String day;
 
-    public FinanceManager(File tsvFile) throws IOException {
-        readTsv(tsvFile);
-        initialSpendEntirePeriod();
-    }
-
-    public FinanceManager(Map<String, List<String>> categories) {
-        this.categories = categories;
-        initialSpendEntirePeriod();
-    }
+    public FinanceManager() {}
 
     public Map<String, Long> getSpendEntirePeriod() {
         return spendEntirePeriod;
     }
-
-    public void readTsv(File tsvFile) throws IOException {
-        try (BufferedReader br = new BufferedReader(new FileReader(tsvFile))) {
-            String nextLine;
-            while ((nextLine = br.readLine()) != null) {
-                List<String> list = new ArrayList<>();
-                String[] s = nextLine.split("\t");
-
-                if (categories.containsKey(s[1])) {
-                    list = categories.get(s[1]);
-                }
-                list.add(s[0]);
-                categories.put(s[1], list);
-            }
-        }
-    }
-
-    public void initialSpendEntirePeriod() {
-        for (String k : categories.keySet()) {
-            spendEntirePeriod.put(k, 0L);
-        }
-        spendEntirePeriod.put(OTHER, 0L);
-    }
-
-    public void addBuy(String buy) {
-        JSONParser parser = new JSONParser();
-        String category = new String();
-
-        try {
-            Object obj = parser.parse(buy);
-            JSONObject jsonObject = (JSONObject) obj;
-            String title = (String) jsonObject.get("title");
-            Long sum = (Long) jsonObject.get("sum");
-
-            for (String k : categories.keySet()) {
-                if (categories.get(k).contains(title)) {
-                    category = k;
-                    break;
-                }
-            }
-            if (category.isEmpty()) {
-                category = OTHER;
-            }
-            sum += spendEntirePeriod.get(category);
-            spendEntirePeriod.put(category, sum);
-        } catch (ParseException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public String maxCategory() {
-        JSONObject obj = new JSONObject();
-        JSONArray jsonArray = new JSONArray();
-
-        Optional<Long> maxValue = spendEntirePeriod.values().stream().max(Long::compareTo);
-
-        if (maxValue.isPresent()) {
-            Long maxSum = maxValue.get();
-            for (Map.Entry<String, Long> kv : spendEntirePeriod.entrySet()) {
-                if (Objects.equals(kv.getValue(), maxSum)) {
-
-                    JSONObject subObj = new JSONObject();
-                    subObj.put("category", kv.getKey());
-                    subObj.put("sum", kv.getValue());
-
-                    jsonArray.add(subObj);
-                }
-            }
-        }
-        obj.put("maxCategory", jsonArray);
-
-        return obj.toJSONString();
-    }
-
     public void saveBin(File file) throws IOException {
         try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(file))) {
             out.writeObject(this);
         }
     }
-
     public static FinanceManager loadFromBin(File file) throws IOException, ClassNotFoundException {
         try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(file))) {
             return (FinanceManager) in.readObject();
         }
     }
+    public Map<String, Long> maxCategoryOfPeriod(Map<String, Map<String, Long>> spendCategoryOfPeriod,
+                                                 String period) {
+        Map<String, Long> subMap = new HashMap<>();
+        for (Map.Entry<String, Map<String, Long>> kv : spendCategoryOfPeriod.entrySet()) {
+            for (String key : kv.getValue().keySet()) {
+                if (key.equals(period)) {
+                    subMap.put(kv.getKey(), kv.getValue().get(key));
+                    break;
+                }
+            }
+        }
+        return getMaxOfMap(subMap);
+    }
+    public Map<String, Long> getMaxOfMap(Map<String, Long> subMap) {
+        Map<String, Long> maxOfMap = new HashMap<>();
+
+        TreeSet<Long> longTreeSet = new TreeSet<>(subMap.values());
+        Long maxSum = longTreeSet.last();
+        for (Map.Entry<String, Long> kv : subMap.entrySet()) {
+            if (kv.getValue().equals(maxSum)) {
+                maxOfMap.put(kv.getKey(), kv.getValue());
+                break;
+            }
+        }
+        return maxOfMap;
+    }
+
+    public void addBuy(Object[] valuesBuy) {
+        String category = (String) valuesBuy[0];
+        String date = (String) valuesBuy[1];
+        Long sum = (Long) valuesBuy[2];
+        year = date.substring(0, 4);
+        month = date.substring(0, 7);
+        day = date;
+
+        addSpend(spendDayCategory, category, day, sum);
+        addSpend(spendMonthCategory, category, month, sum);
+        addSpend(spendYearCategory, category, year, sum);
+
+        addSpendEntire(category, sum);
+    }
+
+    public void addSpendEntire(String category, Long sum) {
+        if (spendEntirePeriod.containsKey(category)) {
+            sum += spendEntirePeriod.get(category);
+        }
+        spendEntirePeriod.put(category, sum);
+    }
+    private void addSpend(Map<String, Map<String, Long>> spendMap, String category,
+                          String date, Long sum) {
+        if (spendMap.containsKey(category)) {
+            Map<String, Long> map = spendMap.get(category);
+            if (map.containsKey(date)) {
+                sum += map.get(date);
+            }
+            map.put(date, sum);
+            spendMap.put(category, map);
+        }
+        spendMap.put(category, new HashMap<>(Map.of(date, sum)));
+    }
+    public Map<String, Map<String, Long>> maxCategory() {
+        Map<String, Map<String, Long>> financeMap = new LinkedHashMap<>();
+
+        Map<String, Long> maxDayCategoryMap = maxCategoryOfPeriod(spendDayCategory, day);
+        Map<String, Long> maxMonthCategoryMap = maxCategoryOfPeriod(spendMonthCategory, month);
+        Map<String, Long> maxYearCategoryMap = maxCategoryOfPeriod(spendYearCategory, year);
+        Map<String, Long> maxEntireCategoryMap = getMaxOfMap(spendEntirePeriod);
+
+        financeMap.put("maxCategory", maxEntireCategoryMap);
+        financeMap.put("maxYearCategory", maxYearCategoryMap);
+        financeMap.put("maxMonthCategory", maxMonthCategoryMap);
+        financeMap.put("maxDayCategory", maxDayCategoryMap);
+
+        return financeMap;
+    }
+
 }
